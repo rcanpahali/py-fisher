@@ -11,17 +11,20 @@ from utils.keyboard import press_space, prepare_for_fishing
 from task_scheduler.scheduler import exit_signal, setup_task_scheduler
 from task_scheduler.message_queue_handler import add_message_to_queue
 
+print("\nFisher script started.\n")
+time.sleep(5)
+
 # Global variables
 template_image_path = 'D:\\fisher-py\\media\\objective.png'
 template_image_save_path = 'D:\\fisher-py\\media\\caught.png'
 template_image = cv2.imread(template_image_path)
 template_match_threshold = 0.55
 templating_delay = 0.35
-max_detection_attempts_threshold = 999 #75
 
 # Bypass variables
+max_detection_attempts_threshold = 75
 bypass_on_fail = True
-bypass_fail_threshold = 5
+bypass_total_fail_threshold = 3
 bypass_fail_count = 0
 
 # Statistical variables
@@ -92,7 +95,7 @@ def check_for_unexpected_attempt_count():
                 
         if bypass_on_fail:
             # Bypass the threshold on fail for a few times
-            if bypass_fail_count >= bypass_fail_threshold:
+            if bypass_fail_count >= bypass_total_fail_threshold:
                 add_message_to_queue("Bypassing threshold limit reached")
                 return True                 
             
