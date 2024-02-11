@@ -1,20 +1,14 @@
-import queue
-import sys
 import time
-import threading
-import schedule
 import pyautogui
 import numpy as np
 import cv2
 import time
-import random
 import pygetwindow as gw
 
 from utils.slack_client import send_text_message_with_image_to_slack
 
-SCHEDULE_TIME_IN_SECONDS = 10
+SCHEDULE_TIME_IN_SECONDS = 5
 
-exit_signal_ingame_message_handler = threading.Event()
 template_image_save_path = 'D:\\fisher-py\\media\\new-message-detected.png'
 
 # Get the window associated information
@@ -22,7 +16,7 @@ window = gw.getWindowsWithTitle("OLD METIN2")[0]
 window_rect = window.left, window.top, window.width, window.height
 window_text_rect = window.left + 2650, window.top + 621, 140, 26
 
-def detect_pixel_color():
+def check_for_ingame_message_text():
     # Take a screenshot of the screen
     screenshot = pyautogui.screenshot(region=window_text_rect)
 
@@ -42,43 +36,22 @@ def detect_pixel_color():
 
     # Check if any pixel in the mask is non-zero (i.e., the color was detected)
     if np.any(mask != 0):
-        print("Color detected!")
         return True
     else:
         return False
 
-##############
-def check_available_tasks():
-    print("Available scheduled tasks:")
-    for job in schedule.get_jobs():
-        print(f"Job: {job.job_func.__name__}, Next run: {job.next_run}")
-#########
-
-def check_for_ingame_message():
-    check_available_tasks() 
-    print("Checking for in-game message")
-    if detect_pixel_color(): # Detect the text pixel color of the message sender
+def continuously_check_for_ingame_message():
+    if check_for_ingame_message_text(): # Detect the text pixel color of the message sender
+            print("\nIn-game message detected!")
             screenshot = pyautogui.screenshot(region=window_rect)
             screenshot.save(template_image_save_path)
             time.sleep(0.5)
-            send_text_message_with_image_to_slack("New message detected", template_image_save_path) 
-
-
+            send_text_message_with_image_to_slack("In-game message detected!", template_image_save_path)
+            time.sleep(0.5)
+            raise InterruptedError("In-game message detected")
 
 # Function to run the scheduler
-def run_scheduler():
+def setup_ingame_message_handler(task_scheduler):
     global SCHEDULE_TIME_IN_SECONDS
-    print("Setting up the task scheduler for ingame message handler")
-    schedule.every(SCHEDULE_TIME_IN_SECONDS).seconds.do(check_for_ingame_message)
-    try:
-        while not exit_signal_ingame_message_handler.is_set():
-            schedule.run_pending()
-            time.sleep(1)
-    except:
-        print("Stopping the program.")
-        exit_signal_ingame_message_handler.set()
-        sys.exit(0)
-
-def setup_ingame_message_handler():
-    thread = threading.Thread(target=run_scheduler)
-    thread.start()
+    print("Setup the in-game message handler")    
+    task_scheduler.every(SCHEDULE_TIME_IN_SECONDS).seconds.do(continuously_check_for_ingame_message)

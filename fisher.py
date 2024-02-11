@@ -7,8 +7,9 @@ import random
 import pygetwindow as gw
 
 from utils.keyboard import press_space, prepare_for_fishing
-from utils.message_queue_handler import add_message_to_queue, exit_signal_slack_message_handler, setup_message_queue_handler
-from utils.ingame_message_handler import exit_signal_ingame_message_handler, setup_ingame_message_handler
+
+from task_scheduler.scheduler import exit_signal, setup_task_scheduler
+from task_scheduler.message_queue_handler import add_message_to_queue
 
 # Global variables
 template_image_path = 'D:\\fisher-py\\media\\objective.png'
@@ -31,11 +32,10 @@ max_detection_attempts_count = 0
 
 # Get the window associated information
 window = gw.getWindowsWithTitle("OLD METIN2")[0]
-window_rect = window.left + 500, window.top, window.width - 1000, window.height - 700
-# window_rect = window.left, window.top, window.width, window.height
-time.sleep(5)
+window_rect = window.left, window.top, window.width, window.height
+window_rect_aoi = window.left + 500, window.top, window.width - 1000, window.height - 700
 window.activate()
-time.sleep(2)
+time.sleep(1)
 
 # Function to check for the presence of the image
 def check_for_image():
@@ -43,8 +43,8 @@ def check_for_image():
     global pull_attempts
     global max_detection_attempts_count
 
-    # Take a screenshot
-    screenshot = pyautogui.screenshot(region=window_rect)
+    # Take a screenshot for the area of interest
+    screenshot = pyautogui.screenshot(region=window_rect_aoi)
 
     # Convert the screenshot to a NumPy array
     screen_image = np.array(screenshot)
@@ -53,7 +53,7 @@ def check_for_image():
     # Match the template in the screenshot
     result = cv2.matchTemplate(screen_image, template_image, cv2.TM_CCOEFF_NORMED)
 
-    if np.max(result) >= template_match_threshold: # 0.55
+    if np.max(result) >= template_match_threshold:
         print("\nImage detected. Score: ", np.max(result))
 
         pull_attempts += 1
@@ -71,7 +71,7 @@ def pull_hook():
     # Check if the window is active
     if not window.isActive:
         window.activate()
-        time.sleep(0.3)
+        time.sleep(0.1)
 
     # Generate a random delay for the hook pull
     random_number = random.uniform(0.1, 0.7)
@@ -121,8 +121,10 @@ def continuously_check_for_image():
             if check_for_image():
                 break
             if check_for_unexpected_attempt_count():
-                raise TimeoutError("Unexpected attempt count")            
-    except (KeyboardInterrupt, TimeoutError):
+                raise TimeoutError("Unexpected attempt count")  
+            if exit_signal.is_set():
+                raise InterruptedError("Exit signal received")          
+    except (KeyboardInterrupt, TimeoutError, InterruptedError):
         global start_time
         global max_detection_attempts_count
         global bypass_fail_count
@@ -138,15 +140,11 @@ def continuously_check_for_image():
         print(f"Script ended at: {time.ctime(end_time)}")
         print(f"Script execution time: {elapsed_time_minutes:.2f} minutes ({elapsed_time_seconds:.2f} seconds)")
         
-        exit_signal_slack_message_handler.set()
-        exit_signal_ingame_message_handler.set()
+        exit_signal.set()
 
         print("\nPress any key to quit.\n")
         input()  # Wait for user to press any key
         sys.exit(1) # Exit the script
 
-# task schedulers
-setup_message_queue_handler()
-# setup_ingame_message_handler()
-
+setup_task_scheduler()
 continuously_check_for_image()

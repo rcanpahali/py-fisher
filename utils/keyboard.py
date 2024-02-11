@@ -18,9 +18,6 @@ def press_space():
     time.sleep(0.5)
     releaseKey('SPACEBAR')
 
-def click_on_message_box():
-    pyautogui.click(2650, 621)
-
 # Predifiend actions
 def prepare_for_fishing():
     time.sleep(2)
