@@ -7,7 +7,7 @@ import pygetwindow as gw
 
 from utils.slack_client import send_text_message_with_image_to_slack
 
-SCHEDULE_TIME_IN_SECONDS = 5
+SCHEDULE_TIME_IN_SECONDS = 15
 
 template_image_save_path = 'D:\\fisher-py\\media\\new-message-detected.png'
 

@@ -19,7 +19,7 @@ template_image_path = 'D:\\fisher-py\\media\\objective.png'
 template_image_save_path = 'D:\\fisher-py\\media\\caught.png'
 template_image = cv2.imread(template_image_path)
 template_match_threshold = 0.55
-templating_delay = 0.35
+templating_delay_speed = 0.45
 
 # Bypass variables
 max_detection_attempts_threshold = 75
@@ -116,11 +116,11 @@ def check_for_unexpected_attempt_count():
 
 # Function to continuously check for the image
 def continuously_check_for_image():
-    global templating_delay
+    global templating_delay_speed
     prepare_for_fishing()
     try:
         while True:
-            time.sleep(templating_delay)
+            time.sleep(templating_delay_speed)
             if check_for_image():
                 break
             if check_for_unexpected_attempt_count():
