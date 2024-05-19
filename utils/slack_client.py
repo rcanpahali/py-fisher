@@ -2,8 +2,8 @@
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-SLACK_TOKEN = "xoxb-3746688324391-6515355105621-KKtpAqvlUN3Blt1bETIT9taQ"
-SLACK_CHANNEL = "C06JMFY1GGZ" #"py-fisher-logs" channel id
+SLACK_TOKEN = "<YOUR_SLACK_TOKEN>"
+SLACK_CHANNEL = "<YOUR_CHANNEL_ID>" #"py-fisher-logs" channel id
 
 # Initialize the Slack WebClient
 slack_client = WebClient(token=SLACK_TOKEN)
