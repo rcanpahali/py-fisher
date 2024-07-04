@@ -1,7 +1,7 @@
 import requests
 import concurrent.futures
 
-url = 'https://global.om2.org/checkusername.php'
+url = '***'
 headers = {
     'authority': 'global.om2.org',
     'accept': '*/*',
