@@ -1,153 +1,103 @@
+from datetime import datetime
+import time
+import pygetwindow as gw
 import cv2
 import numpy as np
-import pyautogui
-import time
-import sys
-import random
-import pygetwindow as gw
+import dxcam
+from pywinauto.application import Application
 
-from utils.keyboard import press_space, prepare_for_fishing
-
-from task_scheduler.scheduler import exit_signal, setup_task_scheduler
-from task_scheduler.message_queue_handler import add_message_to_queue
-
-print("\nFisher script started.\n")
-time.sleep(5)
-
-# Global variables
-template_image_path = 'D:\\fisher-py\\media\\objective.png'
-template_image_save_path = 'D:\\fisher-py\\media\\caught.png'
-template_image = cv2.imread(template_image_path)
-template_match_threshold = 0.55
-templating_delay_speed = 0.45
-
-# Bypass variables
-max_detection_attempts_threshold = 75
-bypass_on_fail = True
-bypass_total_fail_threshold = 3
-bypass_fail_count = 0
-
-# Statistical variables
-start_time = time.time()
-pull_attempts = 0
-detection_attempts = 0
-max_detection_attempts_count = 0
-
-# Get the window associated information
-window = gw.getWindowsWithTitle("OLD METIN2")[0]
-window_rect = window.left, window.top, window.width, window.height
-window_rect_aoi = window.left + 500, window.top, window.width - 1000, window.height - 700
-window.activate()
+# Sleep for a while to ensure the window is ready
 time.sleep(1)
 
-# Function to check for the presence of the image
-def check_for_image():
-    global detection_attempts
-    global pull_attempts
-    global max_detection_attempts_count
+objective = 'D:\\Repos\\py-fisher\\py-fisher\\media\\objective\\objective.jpg'
+# Load the objective image
+objective_img = cv2.imread(objective, cv2.IMREAD_GRAYSCALE)
 
-    # Take a screenshot for the area of interest
-    screenshot = pyautogui.screenshot(region=window_rect_aoi)
+# Get the window handle
+window = gw.getWindowsWithTitle("New Virtual Machine on DESKTOP-6KUQCER - Virtual Machine Connection")[0]
+window.activate()
 
-    # Convert the screenshot to a NumPy array
-    screen_image = np.array(screenshot)
-    screen_image = cv2.cvtColor(screen_image, cv2.COLOR_RGB2BGR)
+# Setup for click action
+app = Application().connect(handle=window._hWnd)
 
-    # Match the template in the screenshot
-    result = cv2.matchTemplate(screen_image, template_image, cv2.TM_CCOEFF_NORMED)
+# Get the window coordinates
+left, top, right, bottom = window.left, window.top, window.right, window.bottom
 
-    if np.max(result) >= template_match_threshold:
-        print("\nImage detected. Score: ", np.max(result))
+# Define the region to capture (top-left 128x128 pixels)
+capture_width = 90
+capture_height = 90
+capture_left = left + 105
+capture_top = top + 205
+capture_right = capture_left + capture_width
+capture_bottom = capture_top + capture_height
 
-        pull_attempts += 1
-        detection_attempts = 0
+# Create the camera object
+camera = dxcam.create()
 
-        pull_hook()
-        prepare_for_fishing()        
+start_time = time.time()
+found = False
+
+def take_screenshot(frame_np, click_x, click_y):
+    # Draw a red dot at the click location
+    cv2.circle(frame_np, (click_x, click_y), radius=5, color=(0, 0, 255), thickness=-1)
+
+    # Save the image
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output = f'D:\\Repos\\py-fisher\\py-fisher\\media\\x_screenshot_{timestamp}.png'
+    cv2.imwrite(output, frame_np)
+
+    # Open the saved screenshot
+    #os.startfile(output)
+
+    print(f"Screenshot saved to {output}")
+
+while True:
+    # Capture the screen region
+    frame = camera.grab(region=(capture_left, capture_top, capture_right, capture_bottom))
+
+    # Convert the frame to a numpy array
+    frame_np = np.array(frame)
+
+    # Convert the captured frame to grayscale
+    frame_gray = cv2.cvtColor(frame_np, cv2.COLOR_BGR2GRAY)
+
+    # Perform template matching
+    result = cv2.matchTemplate(frame_gray, objective_img, cv2.TM_CCOEFF_NORMED)
+
+    # Set a threshold for matching
+    threshold = 0.6
+    loc = np.where(result >= threshold)
+
+    # Check if the objective icon is found
+    if len(loc[0]) > 0:
+        # Get the location of the match
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+        match_loc = max_loc
+
+        # Calculate the center of the matched region
+        match_center_x = match_loc[0] + objective_img.shape[1] // 2
+        match_center_y = match_loc[1] + objective_img.shape[0] // 2
+
+        # Calculate the exact screen coordinates relative to the main screen
+        screen_x = capture_left + match_center_x
+        screen_y = capture_top + match_center_y
+
+        # Click on the exact location
+        app.window(handle=window._hWnd).click_input(coords=(screen_x - left, screen_y - top))
+        print(f"Clicked on the objective icon at ({screen_x}, {screen_y})")
+
+        found = True
+        if (found):
+            take_screenshot(frame_np, match_center_x, match_center_y)
+            time.sleep(0.65)
     else:
-        detection_attempts += 1
-        max_detection_attempts_count = max(detection_attempts, max_detection_attempts_count)
-        print("Image not detected: ", detection_attempts)
-        return False
+        print("Objective icon not found in the screenshot")
 
-def pull_hook():
-    # Check if the window is active
-    if not window.isActive:
-        window.activate()
-        time.sleep(0.1)
+    time.sleep(0.35)
 
-    # Generate a random delay for the hook pull
-    random_number = random.uniform(0.1, 0.7)
-    hook_delay = round(random_number, 5)    
+    # Wait for 1 second before the next iteration
+    if time.time() - start_time > 13:
+        break    
 
-    print("Pulling the hook, delay: ", hook_delay, " - attempt: ", pull_attempts)
-    time.sleep(hook_delay)
-    press_space()
-
-# Function to check for the unexpected attempt count
-def check_for_unexpected_attempt_count():
-    global detection_attempts
-    global bypass_on_fail
-    global bypass_fail_count 
-
-    if detection_attempts >= max_detection_attempts_threshold:
-        add_message_to_queue("Unexpected detection attempt count threshold hit: " + str(detection_attempts))
-                
-        if bypass_on_fail:
-            # Bypass the threshold on fail for a few times
-            if bypass_fail_count >= bypass_total_fail_threshold:
-                add_message_to_queue("Bypassing threshold limit reached")
-                return True                 
-            
-            print("Bypassing the threshold")
-            add_message_to_queue("Bypassing the threshold")
-            detection_attempts = 0
-            time.sleep(5)
-
-            # Take a screenshot and continue processing
-            screenshot = pyautogui.screenshot(region=window_rect)    
-            screenshot.save('D:\\fisher-py\\media\\bypass_on_fail_' + str(bypass_fail_count) + '.png')                                          
-            bypass_fail_count = bypass_fail_count + 1
-
-            continuously_check_for_image()
-            return False
-        else:
-            return True
-
-# Function to continuously check for the image
-def continuously_check_for_image():
-    global templating_delay_speed
-    prepare_for_fishing()
-    try:
-        while True:
-            time.sleep(templating_delay_speed)
-            if check_for_image():
-                break
-            if check_for_unexpected_attempt_count():
-                raise TimeoutError("Unexpected attempt count")  
-            if exit_signal.is_set():
-                raise InterruptedError("Exit signal received")          
-    except (KeyboardInterrupt, TimeoutError, InterruptedError):
-        global start_time
-        global max_detection_attempts_count
-        global bypass_fail_count
-    
-        end_time = time.time()
-        elapsed_time_seconds = end_time - start_time
-        elapsed_time_minutes = elapsed_time_seconds / 60
-
-        print(f"\nMax failed attempts bypass count:", bypass_fail_count)
-        print(f"Max failed attempts count:", max_detection_attempts_count)                
-
-        print(f"\nScript started at: {time.ctime(start_time)}")
-        print(f"Script ended at: {time.ctime(end_time)}")
-        print(f"Script execution time: {elapsed_time_minutes:.2f} minutes ({elapsed_time_seconds:.2f} seconds)")
-        
-        exit_signal.set()
-
-        print("\nPress any key to quit.\n")
-        input()  # Wait for user to press any key
-        sys.exit(1) # Exit the script
-
-setup_task_scheduler()
-continuously_check_for_image()
+if not found:
+    print("Objective icon was not found within the 13 seconds timeframe.")
